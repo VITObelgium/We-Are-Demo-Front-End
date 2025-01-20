@@ -1,0 +1,34 @@
+<div id="operations">
+  <button (click)="login()">Log in</button>
+  <button (click)="switchIdentity()">Switch identity</button>
+  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="issuePodAccessRequest()">Issue access request</button>
+  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="writeDataset()">Write data to Pod</button>
+  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="readDataset()">Read data from Pod</button>
+  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="retrieveAccessGrants()">Retrieve access grants</button>
+  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
+<!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="deletePod()">Delete pod</button>-->
+<!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="emptyPod()">Empty pod</button>-->
+</div>
+
+<div id="session-information">
+  <div *ngIf="sessionInformation?.isLoggedIn">
+      <p>Logged in as: {{ sessionInformation?.webId }}</p>
+      <p>Expiration date: {{ sessionInformation?.expirationDate }}</p>
+      <p>Pods: {{ sessionInformation?.pods!.join(",") }}</p>
+  </div>
+  <div *ngIf="sessionInformation?.accessGrantId">
+      <p>Access grant: {{ sessionInformation?.accessGrantId }}</p>
+      <p>Access grant expiration date: {{ sessionInformation?.accessGrantExpirationDate }}</p>
+  </div>
+  <div *ngIf="accessGrants">
+    <p>All access grants: {{ JSON.stringify(accessGrants) }}</p>
+  </div>
+  <div *ngIf="sessionInformation && !sessionInformation.isLoggedIn">
+      <p>Not logged in</p>
+  </div>
+</div>
+
+<div>
+  <p *ngIf="writtenTurtle">Written turtle: {{ writtenTurtle }}</p>
+  <p *ngIf="readTurtle">Read turtle: {{ readTurtle }}</p>
+</div>
