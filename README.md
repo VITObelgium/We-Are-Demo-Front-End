@@ -1,8 +1,10 @@
-# Introduction - We Are Project and We Are Platform
+# Introduction
+
+## We Are Project and We Are Platform
 
 The We Are partnership, consisting of the Flemish Institute for Technological Research (VITO) – Flemish Patients' Platform (VPP) – Domus Medica (DM) – Zorgnet Icuro (ZI), is committed to enabling the ethical and safe reuse of personal health data for both public and private purposes, with the citizen at the center. The project collaborates closely with Athumi, the provider of the [SOLID](https://solidproject.org/TR/) data vault system in Flanders. This system allows citizens to securely store their data in vaults and share it with third parties based on consent. This project was made possible thanks to the European recovery fund; the Department of Economy, Science & Innovation; the Department of Care & the Department of Digital Flanders. More information at [www.we-are-health.be](https://www.we-are-health.be).
 
-# Demo Weare Frontend
+## What
 
 This is the demo front end project for implementations on the We Are Platform. The front end is written in Angular and is responsible for
 
@@ -12,15 +14,14 @@ This is the demo front end project for implementations on the We Are Platform. T
 - reading data from the user's pod
 - initiating an access request to the data created in the user's pod by calling the We Are Access request endpoint.
 
-## Running the application
+## Setup
 
 Run `npm install` to install all dependencies for the project.
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+Provide an environment using DotEnv, an example can be found in the `.env.example` file. To use the defaults simply copy the `.env.example` file to a new file `.env`.
+The environment determines how to reach your We Are Demo Back-End application instance.
 
-## Build
-
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+Run `npm run start` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
 
 ## Authentication
 

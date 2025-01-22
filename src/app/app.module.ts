@@ -15,7 +15,7 @@ import {environment} from "../environments/environment";
         AppRoutingModule], providers: [
         { provide: FRONTEND_URL, useValue: new URL(environment.frontendUrl) },
         { provide: BACKEND_URL, useValue: new URL(environment.backendUrl) },
-        { provide: AMA_ENDPOINT, useValue: new URL(environment.amaEndpoint) },
+        { provide: AMA_ENDPOINT, useValue: new URL(environment.amaUrl + environment.amaConsentPath) },
         provideHttpClient(withInterceptorsFromDi())
     ] })
 export class AppModule { }

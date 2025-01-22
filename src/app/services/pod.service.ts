@@ -5,7 +5,7 @@ import { Injectable } from '@angular/core';
 import {firstValueFrom} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { SolidDataset, solidDatasetAsTurtle } from "@inrupt/solid-client";
-import { turtleAsSolidDataset } from "@weare/weare-core";
+import { turtleAsSolidDataset } from "@vito-nv/weare-core";
 import {UrlHelper} from "../helper/url-helper";
 import {SessionInformation} from "../interface/session-information";
 import {SessionService} from "./session.service";
@@ -103,12 +103,4 @@ export class PodService {
       responseType: 'text',
     }));
   }
-
-  // shareResource(podRelativeUrl: string): void {
-  //   const redirectUrl = environment.frontend_base_url;
-  //
-  //   window.document.location.href = environment.backend_base_url + environment.backend_access_request
-  //     + '?redirectUrl=' + encodeURIComponent(redirectUrl)
-  //     + '&podRelativeUrl=' + encodeURIComponent(podRelativeUrl);
-  // }
 }
