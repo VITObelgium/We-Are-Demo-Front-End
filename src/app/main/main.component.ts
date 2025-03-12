@@ -117,6 +117,13 @@ export class MainComponent implements OnInit {
   }
 
   /**
+   * Initiates the Authorization Code flow and saves the tokens to the session.
+   */
+  async saveTokensToSession() {
+    this.sessionService.saveTokens();
+  }
+
+  /**
    * Sets a Pod Access Grant received from the user, updating the session information.
    */
   async setPodAccessGrant(accessGrantId: string) {
