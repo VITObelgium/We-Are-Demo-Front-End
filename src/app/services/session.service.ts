@@ -35,6 +35,10 @@ export class SessionService {
     window.location.href = this.urlHelper.getLoginEndpoint(true).href;
   }
 
+  saveTokens() {
+    window.location.href = this.urlHelper.getSaveTokensEndpoint().href;
+  }
+
   logout(): void {
     window.location.href = this.urlHelper.getLogoutEndpoint().href;
   }

@@ -31,6 +31,13 @@ export class UrlHelper {
     return endpoint;
   }
 
+  getSaveTokensEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'login'
+    endpoint.searchParams.set('saveTokens', 'true')
+    return endpoint;
+  }
+
   getLogoutEndpoint() {
     const endpoint = new URL(this.backendUrl.href);
     endpoint.pathname = 'logout'

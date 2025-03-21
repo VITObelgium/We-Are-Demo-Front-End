@@ -4,5 +4,9 @@ export interface SessionInformation {
   accessGrantId?: string,
   accessGrantExpirationDate?: string,
   webId?: string
-  pods?: string[]
+  pods?: string[],
+  tokens?: {
+    accessToken: any,
+    idToken: any
+  }
 }
