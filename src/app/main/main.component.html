@@ -6,9 +6,13 @@
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="writeDataset()">Write data to Pod</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="readDataset()">Read data from Pod</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="retrieveAccessGrants()">Retrieve access grants</button>
+    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="redirect()">Redirect to other application</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
     <!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="deletePod()">Delete pod</button>-->
     <!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="emptyPod()">Empty pod</button>-->
+</div>
+<div>
+    <input type="text" [(ngModel)]="redirectUrl">
 </div>
 
 <div id="session-information">

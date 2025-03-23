@@ -2,7 +2,7 @@
  * Main component of the application, providing user interactions and managing sessions.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, computed, input, Input, OnInit } from '@angular/core';
 import { PodService } from 'src/app/services/pod.service';
 import { ActivatedRoute } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
@@ -27,6 +27,8 @@ import {AccessGrant} from "@inrupt/solid-client-access-grants";
     standalone: false
 })
 export class MainComponent implements OnInit {
+ 
+  redirectUrl = "http://localhost:4201/redirect";
 
   /** Session information about the current user */
   sessionInformation?: SessionInformation;
@@ -141,6 +143,16 @@ export class MainComponent implements OnInit {
 
   async retrieveAccessGrants() {
     this.accessGrants = await this.vcService.getAccessGrants();
+  }
+
+  async redirect() {
+    if(this.sessionInformation && this.sessionInformation.webId) {
+      console.log("Redirecting to sub application with webId.");
+      const encodedWebId = encodeURIComponent(this.sessionInformation?.webId);
+      window.location.href = this.redirectUrl + `?webid=${encodedWebId}`;
+    } else {
+      console.log("User is not logged in.")
+    }
   }
 
   protected readonly JSON = JSON;
