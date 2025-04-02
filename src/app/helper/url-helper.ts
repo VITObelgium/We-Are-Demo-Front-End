@@ -88,4 +88,5 @@ export class UrlHelper {
     endpoint.searchParams.set('redirectUrl', this.getFrontendEndpoint().href)
     return endpoint;
   }
+
 }
