@@ -2,10 +2,10 @@
  * Main component of the application, providing user interactions and managing sessions.
  */
 
-import { Component, computed, input, Input, OnInit } from '@angular/core';
-import { PodService } from 'src/app/services/pod.service';
-import { ActivatedRoute } from '@angular/router';
-import { filter, firstValueFrom } from 'rxjs';
+import {Component, Inject, OnInit} from '@angular/core';
+import {PodService} from 'src/app/services/pod.service';
+import {ActivatedRoute} from '@angular/router';
+import {filter, firstValueFrom} from 'rxjs';
 import {
   addStringNoLocale,
   addUrl,
@@ -14,11 +14,13 @@ import {
   setThing,
   solidDatasetAsTurtle
 } from "@inrupt/solid-client";
-import { SessionService } from "../services/session.service";
-import { SessionInformation } from "../interface/session-information";
-import { UrlHelper } from "../helper/url-helper";
-import { VcService } from "../services/vc.service";
+import {SessionService} from "../services/session.service";
+import {SessionInformation} from "../interface/session-information";
+import {UrlHelper} from "../helper/url-helper";
+import {VcService} from "../services/vc.service";
 import {AccessGrant} from "@inrupt/solid-client-access-grants";
+import {BACKEND_URL} from "../tokens";
+import {HttpClient} from "@angular/common/http";
 
 @Component({
     selector: 'app-main',
@@ -27,7 +29,7 @@ import {AccessGrant} from "@inrupt/solid-client-access-grants";
     standalone: false
 })
 export class MainComponent implements OnInit {
- 
+
   redirectUrl = "http://localhost:4201/redirect";
 
   /** Session information about the current user */
@@ -41,7 +43,14 @@ export class MainComponent implements OnInit {
 
   accessGrants?: AccessGrant[];
 
-  constructor(private sessionService: SessionService, private podService: PodService, private vcService: VcService, private urlHelper: UrlHelper, private route: ActivatedRoute) { }
+  constructor(private sessionService: SessionService,
+              private podService: PodService,
+              private vcService: VcService,
+              private urlHelper: UrlHelper,
+              private route: ActivatedRoute,
+              private http: HttpClient,
+              @Inject(BACKEND_URL) private backendUrl: URL) {
+  }
 
   /**
    * load the sessionInformation and if the user is directed back to this page with an access-grant-id,
@@ -147,13 +156,50 @@ export class MainComponent implements OnInit {
 
   async redirect() {
     if(this.sessionInformation && this.sessionInformation.webId) {
-      console.log("Redirecting to sub application with webId.");
-      const encodedWebId = encodeURIComponent(this.sessionInformation?.webId);
-      window.location.href = this.redirectUrl + `?webid=${encodedWebId}`;
+      const webId = this.sessionInformation?.webId;
+      let backendHtiUrl = this.backendUrl + 'hti-launch?webId=' + encodeURIComponent(webId) + '&redirectUrl=' + encodeURIComponent(this.redirectUrl);
+      const data = await firstValueFrom(this.http.get(backendHtiUrl, {
+            withCredentials: true,
+            responseType: 'json'
+          })) as any
+      this.postForm(
+          this.redirectUrl,
+        {
+          'launch_token': data.launch_token
+        })
+
     } else {
       console.log("User is not logged in.")
     }
   }
+
+  /**
+   * Submits a form with the given parameters to the specified path using the POST method.
+   *
+   * @param {string} path - The URL or path where the form should be submitted.
+   * @param {{ [x: string]: string }} params - A dictionary of key-value pairs to include as hidden form fields.
+   * @return {void} This method does not return a value.
+   */
+  postForm(path: string, params: { [x: string]: string; }) {
+          const method = "post";
+          const form = document.createElement("form");
+          form.setAttribute("method", method);
+          form.setAttribute("action", path);
+
+          for (const key in params) {
+
+              if (Object.prototype.hasOwnProperty.call(params, key)) {
+                  const hiddenField = document.createElement("input");
+                  hiddenField.setAttribute("type", "hidden");
+                  hiddenField.setAttribute("name", key);
+                  hiddenField.setAttribute("value", params[key]);
+
+                  form.appendChild(hiddenField);
+              }
+          }
+          document.body.appendChild(form);
+          form.submit();
+      }
 
   protected readonly JSON = JSON;
 }
