@@ -21,7 +21,7 @@ Run `npm install` to install all dependencies for the project.
 Provide an environment using DotEnv, an example can be found in the `.env.example` file. To use the defaults simply copy the `.env.example` file to a new file `.env`.
 The environment determines how to reach your We Are Demo Back-End application instance.
 
-Run `npm run start` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+Run `npm run start` for a dev server. Navigate to `http://localhost:4299/`. The app will automatically reload if you change any of the source files.
 
 ## Authentication
 

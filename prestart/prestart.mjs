@@ -2,7 +2,7 @@ import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { config } from 'dotenv';
 import { initializeEnvironment } from './environment-validate.mjs';
-import * as angularJson from '../angular.json' assert { type: 'json' };
+import * as angularJson from '../angular.json' with { type: 'json' };
 
 config();
 
