@@ -3,8 +3,8 @@
     <button (click)="switchIdentity()">Switch identity</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="saveTokensToSession()">Print tokens</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="issuePodAccessRequest()">Issue access request</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="writeDataset()">Write data to Pod</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="readDataset()">Read data from Pod</button>
+    <button [disabled]="!sessionInformation?.isLoggedIn || !sessionInformation?.accessGrantId" (click)="writeDataset()">Write data to Pod</button>
+    <button [disabled]="!sessionInformation?.isLoggedIn || !sessionInformation?.accessGrantId" (click)="readDataset()">Read data from Pod</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="retrieveAccessGrants()">Retrieve access grants</button>
     <button [disabled]="!sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
     <!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="deletePod()">Delete pod</button>-->

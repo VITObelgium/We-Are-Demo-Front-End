@@ -1,3 +1,6 @@
-/node_modules/
 .angular
-.env
+/.env
+/.idea/
+/dist/
+/docker-compose.yml
+/node_modules/
