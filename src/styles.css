@@ -1,1 +1,71 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles for the We Are Demo Front-End.
+   Design tokens inspired by the We Are (we-are-health.be) visual identity. */
+
+:root {
+  --blue-100: #D5D5D8;
+  --blue-300: #71727C;
+  --blue-400: #565764;
+  --blue-500: #2C2D3D;
+  --blue-600: #232431;
+
+  --red-100: #F8E2DF;
+  --red-500: #DE705D;
+  --red-600: #B25A4A;
+
+  --lightblue-100: #F2FAFB;
+  --lightblue-300: #D8EFF4;
+  --lightblue-500: #BEE4ED;
+
+  --green-500: #E0EBD3;
+  --success: #2E9E5B;
+  --success-dark: #23814A;
+
+  --grey-200: #F7F8F5;
+  --grey-500: #ECEDE7;
+
+  --white: #FFFFFF;
+  --light: #F9F8F8;
+  --dark: var(--blue-500);
+  --stroke: #E9E9E9;
+  --body-color: var(--blue-300);
+
+  --radius-lg: 1.5rem;
+  --radius-md: 1rem;
+  --radius-pill: 50rem;
+
+  --font-family: "Spline Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+* , *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--body-color);
+  background-color: var(--light);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--dark);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 .5rem;
+}
+
+a {
+  color: var(--red-500);
+}
+
+code {
+  font-size: .8125rem;
+  word-break: break-all;
+}

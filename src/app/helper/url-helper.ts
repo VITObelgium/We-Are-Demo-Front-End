@@ -3,7 +3,6 @@ import {AMA_ENDPOINT, BACKEND_URL, FRONTEND_URL} from "../tokens";
 import {SessionService} from "../services/session.service";
 import {SessionInformation} from "../interface/session-information";
 import {environment} from "../../environments/environment";
-import {AccessRequest} from "@inrupt/solid-client-access-grants";
 
 @Injectable({
   providedIn: "root"
@@ -82,10 +81,43 @@ export class UrlHelper {
     return endpoint;
   }
 
-  getAccessRequestConsentEndpoint(accessRequest: AccessRequest) {
+  getClientCredentialsEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'client-credentials';
+    return endpoint;
+  }
+
+  getHtiLaunchUrlEndpoint(debug?: boolean) {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'hti/launch-url';
+    if (debug !== undefined) endpoint.searchParams.set('debug', debug ? 'true' : 'false');
+    return endpoint;
+  }
+
+  getHtiTokenEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'hti/token';
+    return endpoint;
+  }
+
+  getHtiTokenVerifyEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'hti/token/verify';
+    return endpoint;
+  }
+
+  getFlowStepEndpoint(step: string) {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = `flow/${step}`;
+    return endpoint;
+  }
+
+  getAccessRequestConsentEndpoint(accessRequestId: string, flow?: string) {
     const endpoint = new URL(this.amaEndpoint.href);
-    endpoint.searchParams.set('requestVcUrl', accessRequest.id)
-    endpoint.searchParams.set('redirectUrl', this.getFrontendEndpoint().href)
+    const redirectUrl = new URL(this.getFrontendEndpoint().href);
+    if (flow) redirectUrl.searchParams.set('flow', flow);
+    endpoint.searchParams.set('requestVcUrl', accessRequestId)
+    endpoint.searchParams.set('redirectUrl', redirectUrl.href)
     return endpoint;
   }
 }

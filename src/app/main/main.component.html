@@ -1,39 +1,547 @@
-<div id="operations">
-    <button (click)="login()">Log in</button>
-    <button (click)="switchIdentity()">Switch identity</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="saveTokensToSession()">Print tokens</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="issuePodAccessRequest()">Issue access request</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn || !sessionInformation?.accessGrantId" (click)="writeDataset()">Write data to Pod</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn || !sessionInformation?.accessGrantId" (click)="readDataset()">Read data from Pod</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="retrieveAccessGrants()">Retrieve access grants</button>
-    <button [disabled]="!sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
-    <!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="deletePod()">Delete pod</button>-->
-    <!--  <button [disabled]="!sessionInformation?.isLoggedIn" (click)="emptyPod()">Empty pod</button>-->
-</div>
+<header class="hero">
+  <div class="hero__inner">
+    <div class="hero__top">
+      <div class="hero__brand">
+        <span class="hero__logo">We Are Demo</span>
+      </div>
+      <div class="hero__actions">
+        <div class="hero__pattern" aria-hidden="true"></div>
+        <button class="btn btn--ghost" *ngIf="sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
+      </div>
+    </div>
+  </div>
+</header>
 
-<div id="session-information">
-    <div *ngIf="sessionInformation?.isLoggedIn">
-        <p>Logged in as: {{ sessionInformation?.webId }}</p>
-        <p>Expiration date: {{ sessionInformation?.expirationDate }}</p>
-        <p>Pods: {{ sessionInformation?.pods!.join(",") }}</p>
-    </div>
-    <div *ngIf="sessionInformation?.accessGrantId">
-        <p>Access grant: {{ sessionInformation?.accessGrantId }}</p>
-        <p>Access grant expiration date: {{ sessionInformation?.accessGrantExpirationDate }}</p>
-    </div>
-    <div *ngIf="sessionInformation?.tokens">
-        <p>ID token: {{ sessionInformation?.tokens!.idToken }}</p>
-        <p>Access token: {{ sessionInformation?.tokens!.accessToken }}</p>
-    </div>
-    <div *ngIf="accessGrants">
-        <p>All access grants: {{ JSON.stringify(accessGrants) }}</p>
-    </div>
-    <div *ngIf="sessionInformation && !sessionInformation.isLoggedIn">
-        <p>Not logged in</p>
-    </div>
-</div>
+<main class="page">
 
-<div>
-    <p *ngIf="writtenTurtle">Written turtle: {{ writtenTurtle }}</p>
-    <p *ngIf="readTurtle">Read turtle: {{ readTurtle }}</p>
-</div>
+  <!-- Error banner -->
+  <div class="banner banner--error" *ngIf="errorMessage">
+    <span>{{ errorMessage }}</span>
+    <button class="banner__close" (click)="errorMessage = undefined" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <!-- Client credentials -->
+  <section class="card card--credentials">
+    <div class="card__heading">
+      <h2>Client credentials</h2>
+      <span class="pill pill--success" *ngIf="sessionInformation?.usingCustomCredentials">
+        <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        Custom credentials active
+      </span>
+      <span class="pill" *ngIf="!sessionInformation?.usingCustomCredentials">Default credentials</span>
+    </div>
+    <p class="card__description">
+      Optionally set your own client ID and client secret on the back-end session.
+      All subsequent calls in both flows will use these credentials instead of the default ones.
+    </p>
+    <div class="credentials__form">
+      <label class="field">
+        <span class="field__label">Client ID</span>
+        <input type="text" [(ngModel)]="clientId" name="clientId" placeholder="https://id.we-are-acc.vito.be/client/..." autocomplete="off"/>
+      </label>
+      <label class="field">
+        <span class="field__label">Client secret</span>
+        <input type="password" [(ngModel)]="clientSecret" name="clientSecret" placeholder="Client secret" autocomplete="off"/>
+      </label>
+      <div class="credentials__actions">
+        <button class="btn btn--primary" [disabled]="credentialsBusy || !clientId || !clientSecret" (click)="saveClientCredentials()">
+          {{ credentialsBusy ? 'Saving…' : 'Save on session' }}
+        </button>
+        <button class="btn btn--secondary" *ngIf="sessionInformation?.usingCustomCredentials" [disabled]="credentialsBusy" (click)="resetClientCredentials()">
+          Use defaults
+        </button>
+      </div>
+    </div>
+    <p class="credentials__current" *ngIf="sessionInformation?.usingCustomCredentials">
+      Active client ID: <code>{{ sessionInformation?.clientId }}</code>
+    </p>
+  </section>
+
+  <!-- Flow tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tabs__tab" role="tab" [class.tabs__tab--active]="activeTab === 'oidc'" [attr.aria-selected]="activeTab === 'oidc'" (click)="selectTab('oidc')">
+      <span class="tabs__step">1</span> OIDC flow
+    </button>
+    <button class="tabs__tab" role="tab" [class.tabs__tab--active]="activeTab === 'hti'" [attr.aria-selected]="activeTab === 'hti'" (click)="selectTab('hti')">
+      <span class="tabs__step">2</span> HTI flow
+    </button>
+  </div>
+
+  <!-- OIDC flow -->
+  <section class="card card--flow" *ngIf="activeTab === 'oidc'">
+    <p class="card__description">
+      The citizen logs in with the We Are OpenID Connect provider. The back-end performs the code
+      exchange, resolves the Web ID and pod, and uses client authentication for the access request.
+      The steps below mirror the "01. OIDC flow" folder of the Postman collection.
+    </p>
+
+    <ol class="steps">
+      <!-- 01. Fetch and save OIDC configuration -->
+      <li class="step" [class.step--done]="!!steps.oidcConfiguration">
+        <span class="step__marker">
+          <svg *ngIf="steps.oidcConfiguration" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!steps.oidcConfiguration">1</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Fetch and save OIDC configuration</h3>
+          <p class="step__description">
+            Fetch the <code>.well-known/openid-configuration</code> of the We Are OIDC provider
+            and save the resolved endpoints on the back-end session.
+          </p>
+          <div class="step__actions">
+            <button class="btn btn--primary" [disabled]="busyAction === 'oidc-configuration'" (click)="runStep('oidc-configuration')">
+              {{ busyAction === 'oidc-configuration' ? 'Fetching…' : (steps.oidcConfiguration ? 'Refetch OIDC configuration' : 'Fetch OIDC configuration') }}
+            </button>
+          </div>
+          <div class="step__result" *ngIf="steps.oidcConfiguration as oidcConfiguration">
+            <p>Fetched from: <code>{{ oidcConfiguration.fetchedFrom }}</code></p>
+            <p>Issuer: <code>{{ oidcConfiguration.issuer }}</code></p>
+            <p>Authorization endpoint: <code>{{ oidcConfiguration.authorizationEndpoint }}</code></p>
+            <p>Token endpoint: <code>{{ oidcConfiguration.tokenEndpoint }}</code></p>
+            <p *ngIf="oidcConfiguration.jwksUri">JWKS URI: <code>{{ oidcConfiguration.jwksUri }}</code></p>
+          </div>
+        </div>
+      </li>
+
+      <!-- 02. Authorize via browser -->
+      <li class="step" [class.step--done]="isAuthenticated('oidc')">
+        <span class="step__marker">
+          <svg *ngIf="isAuthenticated('oidc')" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!isAuthenticated('oidc')">2</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Authorize via browser</h3>
+          <p class="step__description">Authenticate the citizen with the We Are OpenID Connect provider in the browser (authorization code flow).</p>
+          <div class="step__actions" *ngIf="!isAuthenticated('oidc')">
+            <button class="btn btn--primary" (click)="login()">Log in</button>
+            <button class="btn btn--secondary" (click)="switchIdentity()">Switch identity</button>
+          </div>
+          <div class="step__result" *ngIf="isAuthenticated('oidc')">
+            <p>Logged in as <code>{{ sessionInformation?.webId }}</code></p>
+            <p *ngIf="sessionInformation?.expirationDate">Session expires: {{ sessionInformation?.expirationDate }}</p>
+            <div class="step__actions">
+              <button class="btn btn--secondary" (click)="switchIdentity()">Switch identity</button>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <!-- 03. Perform code exchange -->
+      <li class="step" [class.step--done]="isAuthenticated('oidc')" [class.step--disabled]="!isAuthenticated('oidc')">
+        <span class="step__marker">
+          <svg *ngIf="isAuthenticated('oidc')" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!isAuthenticated('oidc')">3</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Perform code exchange</h3>
+          <p class="step__description">
+            The back-end exchanges the authorization code for tokens on the token endpoint.
+            This happens automatically at the redirect endpoint during the login above.
+          </p>
+          <div class="step__result" *ngIf="isAuthenticated('oidc')">
+            <p>Code exchange performed by the back-end during the redirect.</p>
+            <div class="step__actions" *ngIf="!sessionInformation?.tokens">
+              <button class="btn btn--secondary" (click)="saveTokensToSession()">Re-run and print tokens</button>
+            </div>
+            <div *ngIf="sessionInformation?.tokens" class="turtle">
+              <p>ID token: <code>{{ sessionInformation?.tokens!.idToken }}</code></p>
+              <p>Access token: <code>{{ sessionInformation?.tokens!.accessToken }}</code></p>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <ng-container *ngTemplateOutlet="sharedSteps; context: {flow: 'oidc', offset: 4}"></ng-container>
+    </ol>
+  </section>
+
+  <!-- HTI flow -->
+  <section class="card card--flow" *ngIf="activeTab === 'hti'">
+    <p class="card__description">
+      The citizen authenticates via the We Are PIMS HTI launch. The PIMS issues an HTI token (JWT)
+      containing the citizen's Web ID, which is exchanged with the back-end. Pod access is then
+      arranged with client authentication only — no user OIDC session is required.
+      The steps below mirror the "02. HTI flow" folder of the Postman collection.
+    </p>
+
+    <ol class="steps">
+      <!-- 01. Fetch first redirect URI / launch URL -->
+      <li class="step" [class.step--done]="!!htiLaunchUrl || htiLaunchOpened || isAuthenticated('hti')">
+        <span class="step__marker">
+          <svg *ngIf="htiLaunchUrl || htiLaunchOpened || isAuthenticated('hti')" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!htiLaunchUrl && !htiLaunchOpened && !isAuthenticated('hti')">1</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Fetch the HTI launch URL</h3>
+          <p class="step__description">
+            The back-end builds the We Are PIMS HTI launch URL, using its own <code>/hti/capture</code>
+            endpoint as the redirect URI so the token is captured automatically.
+          </p>
+          <label class="step__toggle">
+            <input type="checkbox" [(ngModel)]="htiDebug" name="htiDebug"/>
+            Debug mode (show token on the PIMS for manual copy/paste, instead of auto-capturing it)
+          </label>
+          <div class="step__actions">
+            <button class="btn btn--primary" [disabled]="busyAction === 'hti-launch-url'" (click)="fetchHtiLaunchUrl()">
+              {{ busyAction === 'hti-launch-url' ? 'Fetching…' : (htiLaunchUrl ? 'Refetch launch URL' : 'Fetch launch URL') }}
+            </button>
+          </div>
+          <div class="step__result" *ngIf="htiLaunchUrl">
+            <p>Launch URL: <code>{{ htiLaunchUrl }}</code></p>
+          </div>
+        </div>
+      </li>
+
+      <!-- 02. Authenticate via browser -->
+      <li class="step" [class.step--done]="htiLaunchOpened || isAuthenticated('hti')">
+        <span class="step__marker">
+          <svg *ngIf="htiLaunchOpened || isAuthenticated('hti')" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!htiLaunchOpened && !isAuthenticated('hti')">2</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Get the HTI token via browser</h3>
+          <p class="step__description" *ngIf="htiDebug">
+            Opens the We Are PIMS HTI launch page in a new tab. After logging in,
+            the PIMS shows the HTI token to paste in the next step.
+          </p>
+          <p class="step__description" *ngIf="!htiDebug">
+            Navigates to the We Are PIMS HTI launch page. After logging in, the PIMS
+            automatically submits the HTI token back to the back-end, which brings you
+            straight back here once the Web ID has been captured.
+          </p>
+          <div class="step__actions">
+            <button class="btn btn--primary" [disabled]="busyAction === 'hti-launch'" (click)="openHtiLaunch()">
+              {{ busyAction === 'hti-launch' ? 'Opening…' : (htiDebug ? 'Open HTI launch page' : 'Continue to We Are login') }}
+            </button>
+          </div>
+        </div>
+      </li>
+
+      <!-- 03. Save Web ID by HTI token -->
+      <li class="step" [class.step--done]="isAuthenticated('hti')">
+        <span class="step__marker">
+          <svg *ngIf="isAuthenticated('hti')" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!isAuthenticated('hti')">3</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Save the Web ID from the HTI token</h3>
+          <p class="step__description" *ngIf="!isAuthenticated('hti')">
+            In debug mode, paste the base64-encoded HTI token shown by the PIMS below;
+            the back-end extracts the citizen's Web ID from it and saves it on the session.
+            Without debug mode this step completes automatically.
+          </p>
+          <div class="step__form" *ngIf="!isAuthenticated('hti')">
+            <textarea rows="4" [(ngModel)]="htiToken" name="htiToken" placeholder="Paste the HTI token (eyJ…) here"></textarea>
+            <div class="step__actions">
+              <button class="btn btn--primary" [disabled]="!htiToken || busyAction === 'hti-token'" (click)="submitHtiToken()">
+                {{ busyAction === 'hti-token' ? 'Exchanging…' : 'Save Web ID' }}
+              </button>
+            </div>
+          </div>
+          <div class="step__result" *ngIf="isAuthenticated('hti')">
+            <p>Web ID: <code>{{ sessionInformation?.webId }}</code></p>
+          </div>
+        </div>
+      </li>
+
+
+      <!-- 04. Verify the HTI token (additional hardening step) -->
+      <li class="step" [class.step--done]="htiTokenVerified" [class.step--disabled]="!isAuthenticated('hti')">
+        <span class="step__marker">
+          <svg *ngIf="htiTokenVerified" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+          <span *ngIf="!htiTokenVerified">4</span>
+        </span>
+        <div class="step__body">
+          <h3 class="step__title">Verify the HTI token</h3>
+          <p class="step__description">
+            The back-end validates the token's signature against the JWKS published by its issuer
+            (resolved via OIDC discovery), including the expiry and issuer claims.
+          </p>
+          <div class="step__actions" *ngIf="!htiTokenVerified">
+            <button class="btn btn--primary" [disabled]="!isAuthenticated('hti') || busyAction === 'hti-verify'" (click)="verifyHtiToken()">
+              {{ busyAction === 'hti-verify' ? 'Verifying…' : 'Verify token signature' }}
+            </button>
+          </div>
+          <div class="step__result" *ngIf="htiTokenVerified">
+            <p>Signature verified<ng-container *ngIf="htiVerification?.algorithm"> ({{ htiVerification?.algorithm }}<ng-container *ngIf="htiVerification?.keyId">, key <code>{{ htiVerification?.keyId }}</code></ng-container>)</ng-container></p>
+            <p *ngIf="htiVerification?.issuer">Issuer: <code>{{ htiVerification?.issuer }}</code></p>
+            <p *ngIf="htiVerification?.expiresAt">Token expires: {{ htiVerification?.expiresAt }}</p>
+          </div>
+        </div>
+      </li>
+
+      <ng-container *ngTemplateOutlet="sharedSteps; context: {flow: 'hti', offset: 5}"></ng-container>
+    </ol>
+  </section>
+
+  <!-- Shared steps (Postman 04-14, identical in both flows) -->
+  <ng-template #sharedSteps let-flow="flow" let-offset="offset">
+    <!-- Fetch Web ID and save Pod -->
+    <li class="step" [class.step--done]="hasPod" [class.step--disabled]="!isAuthenticated(flow) && !hasPod">
+      <span class="step__marker">
+        <svg *ngIf="hasPod" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!hasPod">{{ offset }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Fetch Web ID and save pod</h3>
+        <p class="step__description">
+          The back-end dereferences the Web ID document and saves the citizen's pod
+          (<code>pim:storage</code>) on the session. This happens automatically after authenticating.
+        </p>
+        <div class="step__result" *ngIf="hasPod">
+          <p>Web ID: <code>{{ sessionInformation?.webId }}</code></p>
+          <p>Pod: <code>{{ sessionInformation?.pods!.join(", ") }}</code></p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Perform client authentication -->
+    <li class="step" [class.step--done]="!!steps.clientAuthentication">
+      <span class="step__marker">
+        <svg *ngIf="steps.clientAuthentication" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.clientAuthentication">{{ offset + 1 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Perform client authentication</h3>
+        <p class="step__description">
+          The back-end authenticates itself on the We Are OIDC token endpoint using the
+          client credentials grant. The access token is saved on the session.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="busyAction === 'client-authentication'" (click)="runStep('client-authentication')">
+            {{ busyAction === 'client-authentication' ? 'Authenticating…' : (steps.clientAuthentication ? 'Re-authenticate client' : 'Authenticate client') }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.clientAuthentication as clientAuthentication">
+          <p>Token type: <code>{{ clientAuthentication.tokenType }}</code><ng-container *ngIf="clientAuthentication.expiresIn"> — expires in {{ clientAuthentication.expiresIn }}s</ng-container></p>
+          <p *ngIf="clientAuthentication.scope">Scope: <code>{{ clientAuthentication.scope }}</code></p>
+          <p>Access token: <code>{{ clientAuthentication.accessTokenPreview }}</code></p>
+          <p *ngIf="clientAuthentication.idTokenPreview">ID token: <code>{{ clientAuthentication.idTokenPreview }}</code></p>
+          <p>Obtained at: {{ clientAuthentication.obtainedAt }}</p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Fetch and save VC configuration -->
+    <li class="step" [class.step--done]="!!steps.vcConfiguration">
+      <span class="step__marker">
+        <svg *ngIf="steps.vcConfiguration" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.vcConfiguration">{{ offset + 2 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Fetch and save VC configuration</h3>
+        <p class="step__description">
+          Fetch the <code>.well-known/vc-configuration</code> of the Verifiable Credentials
+          provider and save the resolved service endpoints on the session.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="busyAction === 'vc-configuration'" (click)="runStep('vc-configuration')">
+            {{ busyAction === 'vc-configuration' ? 'Fetching…' : (steps.vcConfiguration ? 'Refetch VC configuration' : 'Fetch VC configuration') }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.vcConfiguration as vcConfiguration">
+          <p>Fetched from: <code>{{ vcConfiguration.fetchedFrom }}</code></p>
+          <p *ngIf="vcConfiguration.issuerService">Issuer service: <code>{{ vcConfiguration.issuerService }}</code></p>
+          <p *ngIf="vcConfiguration.derivationService">Derivation service: <code>{{ vcConfiguration.derivationService }}</code></p>
+          <p *ngIf="vcConfiguration.queryService">Query service: <code>{{ vcConfiguration.queryService }}</code></p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Create access request -->
+    <li class="step" [class.step--done]="!!steps.accessRequestId || hasAccessGrant" [class.step--disabled]="!isAuthenticated(flow) && !steps.accessRequestId && !hasAccessGrant">
+      <span class="step__marker">
+        <svg *ngIf="steps.accessRequestId || hasAccessGrant" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.accessRequestId && !hasAccessGrant">{{ offset + 3 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Create access request</h3>
+        <p class="step__description">
+          Issue an access request (Verifiable Credential) for the citizen's pod on the
+          VC issuer service, using client authentication.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!isAuthenticated(flow) || busyAction === 'access-request'" (click)="createAccessRequest()">
+            {{ busyAction === 'access-request' ? 'Creating…' : (steps.accessRequestId ? 'Recreate access request' : 'Create access request') }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.accessRequestId">
+          <p>Access request: <code>{{ steps.accessRequestId }}</code></p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Consent to access request -->
+    <li class="step" [class.step--done]="hasAccessGrant" [class.step--disabled]="!steps.accessRequestId && !hasAccessGrant">
+      <span class="step__marker">
+        <svg *ngIf="hasAccessGrant" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!hasAccessGrant">{{ offset + 4 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Consent to access request via browser</h3>
+        <p class="step__description">
+          Redirect the citizen to the Access Management Application, where they consent
+          to the access request. Afterwards they are sent back to this page.
+        </p>
+        <div class="step__actions" *ngIf="!hasAccessGrant">
+          <button class="btn btn--primary" [disabled]="!steps.accessRequestId || busyAction === 'consent'" (click)="goToConsent()">
+            {{ busyAction === 'consent' ? 'Redirecting…' : 'Give consent' }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="hasAccessGrant">
+          <p>Consent given — an access grant was issued.</p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Fetch access grant -->
+    <li class="step" [class.step--done]="hasAccessGrant" [class.step--disabled]="!hasAccessGrant">
+      <span class="step__marker">
+        <svg *ngIf="hasAccessGrant" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!hasAccessGrant">{{ offset + 5 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Fetch access grant</h3>
+        <p class="step__description">
+          The back-end fetches the access grant (Verifiable Credential) by its ID and saves
+          it on the session. This happens automatically when returning from the consent page.
+        </p>
+        <div class="step__result" *ngIf="hasAccessGrant">
+          <p>Access grant: <code>{{ sessionInformation?.accessGrantId }}</code></p>
+          <p>Expires: {{ sessionInformation?.accessGrantExpirationDate }}</p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Fetch UMA configuration -->
+    <li class="step" [class.step--done]="!!steps.umaConfiguration" [class.step--disabled]="!hasPod">
+      <span class="step__marker">
+        <svg *ngIf="steps.umaConfiguration" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.umaConfiguration">{{ offset + 6 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Fetch UMA configuration</h3>
+        <p class="step__description">
+          Discover the UMA authorization server protecting the pod (via the <code>WWW-Authenticate</code>
+          challenge) and fetch its <code>.well-known/uma2-configuration</code>.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!hasPod || busyAction === 'uma-configuration'" (click)="runStep('uma-configuration')">
+            {{ busyAction === 'uma-configuration' ? 'Fetching…' : (steps.umaConfiguration ? 'Refetch UMA configuration' : 'Fetch UMA configuration') }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.umaConfiguration as umaConfiguration">
+          <p>Authorization server: <code>{{ umaConfiguration.asUri }}</code></p>
+          <p *ngIf="umaConfiguration.issuer">Issuer: <code>{{ umaConfiguration.issuer }}</code></p>
+          <p *ngIf="umaConfiguration.tokenEndpoint">Token endpoint: <code>{{ umaConfiguration.tokenEndpoint }}</code></p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Get UMA ticket -->
+    <li class="step" [class.step--done]="!!steps.umaTicket" [class.step--disabled]="!hasPod">
+      <span class="step__marker">
+        <svg *ngIf="steps.umaTicket" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.umaTicket">{{ offset + 7 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Get UMA ticket</h3>
+        <p class="step__description">
+          Request the protected resource without authorization; the resource server answers
+          with a UMA permission ticket in the <code>WWW-Authenticate</code> header.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!hasPod || busyAction === 'uma-ticket'" (click)="runStep('uma-ticket')">
+            {{ busyAction === 'uma-ticket' ? 'Requesting…' : (steps.umaTicket ? 'Get a new UMA ticket' : 'Get UMA ticket') }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.umaTicket as umaTicket">
+          <p>Resource: <code>{{ umaTicket.resource }}</code></p>
+          <p>Ticket: <code>{{ umaTicket.ticketPreview }}</code></p>
+          <p>Obtained at: {{ umaTicket.obtainedAt }}</p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Exchange UMA ticket and access grant for access token -->
+    <li class="step" [class.step--done]="!!steps.umaAccessToken" [class.step--disabled]="!steps.umaTicket || !hasAccessGrant || !steps.clientAuthentication">
+      <span class="step__marker">
+        <svg *ngIf="steps.umaAccessToken" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!steps.umaAccessToken">{{ offset + 8 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Exchange UMA ticket &amp; access grant for access token</h3>
+        <p class="step__description">
+          Present the UMA ticket together with the access grant (as a Verifiable Presentation
+          claim token) on the UMA token endpoint to obtain a UMA access token.
+          Requires the client authentication, access grant and UMA ticket steps.
+        </p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!steps.umaTicket || !hasAccessGrant || !steps.clientAuthentication || busyAction === 'uma-token'" (click)="runStep('uma-token')">
+            {{ busyAction === 'uma-token' ? 'Exchanging…' : 'Exchange for access token' }}
+          </button>
+        </div>
+        <div class="step__result" *ngIf="steps.umaAccessToken as umaAccessToken">
+          <p>Token type: <code>{{ umaAccessToken.tokenType }}</code><ng-container *ngIf="umaAccessToken.expiresIn"> — expires in {{ umaAccessToken.expiresIn }}s</ng-container></p>
+          <p>Access token: <code>{{ umaAccessToken.accessTokenPreview }}</code></p>
+          <p>Obtained at: {{ umaAccessToken.obtainedAt }}</p>
+        </div>
+      </div>
+    </li>
+
+    <!-- Write to pod -->
+    <li class="step" [class.step--done]="!!$any(writtenTurtle)[flow]" [class.step--disabled]="!hasAccessGrant">
+      <span class="step__marker">
+        <svg *ngIf="$any(writtenTurtle)[flow]" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!$any(writtenTurtle)[flow]">{{ offset + 9 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Write data to the pod</h3>
+        <p class="step__description">Write a sample RDF dataset to the citizen's pod using the access grant.</p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!hasAccessGrant || busyAction === 'write'" (click)="writeDataset()">
+            {{ busyAction === 'write' ? 'Writing…' : 'Write data to pod' }}
+          </button>
+        </div>
+        <pre class="turtle" *ngIf="$any(writtenTurtle)[flow]">{{ $any(writtenTurtle)[flow] }}</pre>
+      </div>
+    </li>
+
+    <!-- Read from pod -->
+    <li class="step step--last" [class.step--done]="!!$any(readTurtle)[flow]" [class.step--disabled]="!hasAccessGrant">
+      <span class="step__marker">
+        <svg *ngIf="$any(readTurtle)[flow]" class="check-icon check-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
+        <span *ngIf="!$any(readTurtle)[flow]">{{ offset + 10 }}</span>
+      </span>
+      <div class="step__body">
+        <h3 class="step__title">Read data from the pod</h3>
+        <p class="step__description">Read the dataset back from the citizen's pod using the access grant.</p>
+        <div class="step__actions">
+          <button class="btn btn--primary" [disabled]="!hasAccessGrant || busyAction === 'read'" (click)="readDataset()">
+            {{ busyAction === 'read' ? 'Reading…' : 'Read data from pod' }}
+          </button>
+        </div>
+        <pre class="turtle" *ngIf="$any(readTurtle)[flow]">{{ $any(readTurtle)[flow] }}</pre>
+      </div>
+    </li>
+  </ng-template>
+
+  <!-- Extras -->
+  <section class="card card--extras" *ngIf="sessionInformation?.isLoggedIn">
+    <div class="card__heading">
+      <h2>Session utilities</h2>
+    </div>
+    <div class="step__actions">
+      <button class="btn btn--secondary" [disabled]="busyAction === 'access-grants'" (click)="retrieveAccessGrants()">
+        {{ busyAction === 'access-grants' ? 'Retrieving…' : 'Retrieve access grants' }}
+      </button>
+      <button class="btn btn--secondary" (click)="logout()">Log out</button>
+    </div>
+    <pre class="turtle" *ngIf="accessGrants">{{ JSON.stringify(accessGrants, null, 2) }}</pre>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>We Are Demo Front-End — demo application for the We Are platform.</p>
+</footer>
