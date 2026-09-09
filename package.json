@@ -18,7 +18,7 @@
     "@angular/router": "19.1.1",
     "@inrupt/solid-client": "^2.1.2",
     "@inrupt/solid-client-access-grants": "^3.2.1",
-    "@vito-nv/weare-core": "^1.0.0",
+    "@vito-nv/weare-core": "^1.0.15",
     "rxjs": "~7.8.1",
     "zone.js": "~0.15.0"
   },
