@@ -13,9 +13,7 @@ const envConfigFile = `
 export const environment = {
   production: false,
   frontendUrl: "${process.env['PROTOCOL']}://${process.env['HOST']}:${process.env['PORT']}",
-  backendUrl: "${process.env['BACKEND_URL']}",
-  amaUrl: "${process.env['AMA_URL']}",
-  amaConsentPath: "${process.env['AMA_CONSENT_PATH']}"
+  backendUrl: "${process.env['BACKEND_URL']}"
 };
 `;
 writeFileSync(targetPath, envConfigFile, { encoding: 'utf8' });

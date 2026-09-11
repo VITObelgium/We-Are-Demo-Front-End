@@ -6,6 +6,9 @@
       </div>
       <div class="hero__actions">
         <div class="hero__pattern" aria-hidden="true"></div>
+        <button class="btn btn--ghost" [disabled]="sessionResetBusy" (click)="resetSession()">
+          {{ sessionResetBusy ? 'Resetting…' : 'Reset session' }}
+        </button>
         <button class="btn btn--ghost" *ngIf="sessionInformation?.isLoggedIn" (click)="logout()">Log out</button>
       </div>
     </div>
@@ -20,18 +23,59 @@
     <button class="banner__close" (click)="errorMessage = undefined" aria-label="Dismiss">&times;</button>
   </div>
 
+  <!-- Environment / client switcher -->
+  <section class="card card--credentials">
+    <div class="card__heading">
+      <h2>We Are environment</h2>
+      <span class="pill">{{ sessionInformation?.environment ?? selectedEnvironment }}</span>
+    </div>
+    <p class="card__description">
+      Switch between the We Are test, acceptance and production environments, and pick one of the
+      configured client credential pairs for the selected environment, or the volatile custom
+      credentials entered below (if any were saved for it).
+    </p>
+    <div class="credentials__form">
+      <label class="field">
+        <span class="field__label">Environment</span>
+        <select [ngModel]="selectedEnvironment" (ngModelChange)="selectEnvironment($event)" name="environment" [disabled]="environmentBusy">
+          <option *ngFor="let environment of credentialOptions?.environments" [value]="environment">{{ environment }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Client</span>
+        <select [ngModel]="selectedClientOption" (ngModelChange)="selectClientOption($event)" name="clientIndex" [disabled]="environmentBusy || (!clientOptionsForSelectedEnvironment.length && !hasCustomCredentialsForSelectedEnvironment)">
+          <option *ngFor="let client of clientOptionsForSelectedEnvironment" [value]="client.index">{{ client.displayName }}</option>
+          <option *ngIf="hasCustomCredentialsForSelectedEnvironment" [value]="CUSTOM_CLIENT_OPTION">
+            ⚡ {{ customCredentialsDisplayNameForSelectedEnvironment }} (volatile)
+          </option>
+        </select>
+      </label>
+      <span class="pill pill--warning" *ngIf="selectedClientOption === CUSTOM_CLIENT_OPTION" title="Volatile: only kept on this session, not persisted in the back-end's configuration.">
+        ⚡ Volatile
+      </span>
+    </div>
+    <p class="credentials__current" *ngIf="!clientOptionsForSelectedEnvironment.length && !hasCustomCredentialsForSelectedEnvironment">
+      No client credentials configured for the '{{ selectedEnvironment }}' environment. Add
+      WEARE_OIDC_CLIENT_ID_1_{{ selectedEnvironment }} / WEARE_OIDC_CLIENT_SECRET_1_{{ selectedEnvironment }}
+      to the back-end's .env file, or set custom credentials below.
+    </p>
+  </section>
+
   <!-- Client credentials -->
   <section class="card card--credentials">
     <div class="card__heading">
       <h2>Client credentials</h2>
       <span class="pill pill--success" *ngIf="sessionInformation?.usingCustomCredentials">
         <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 8.9" fill="none"/></svg>
-        Custom credentials active
+        ⚡ Custom credentials active (volatile)
       </span>
-      <span class="pill" *ngIf="!sessionInformation?.usingCustomCredentials">Default credentials</span>
+      <span class="pill" *ngIf="!sessionInformation?.usingCustomCredentials">{{ sessionInformation?.clientDisplayName ?? 'Default credentials' }}</span>
     </div>
     <p class="card__description">
-      Optionally set your own client ID and client secret on the back-end session.
+      Optionally set your own client ID and client secret on the back-end session, for the
+      environment selected above. These are volatile: they only live on this session (not
+      persisted in the back-end's configuration), but are kept around per environment so you
+      can switch back to them later via the "Client" dropdown above.
       All subsequent calls in both flows will use these credentials instead of the default ones.
     </p>
     <div class="credentials__form">
@@ -42,6 +86,10 @@
       <label class="field">
         <span class="field__label">Client secret</span>
         <input type="password" [(ngModel)]="clientSecret" name="clientSecret" placeholder="Client secret" autocomplete="off"/>
+      </label>
+      <label class="field">
+        <span class="field__label">Display name (optional)</span>
+        <input type="text" [(ngModel)]="clientDisplayName" name="clientDisplayName" placeholder="e.g. My test client" autocomplete="off"/>
       </label>
       <div class="credentials__actions">
         <button class="btn btn--primary" [disabled]="credentialsBusy || !clientId || !clientSecret" (click)="saveClientCredentials()">
@@ -225,12 +273,15 @@
         </span>
         <div class="step__body">
           <h3 class="step__title">Save the Web ID from the HTI token</h3>
-          <p class="step__description" *ngIf="!isAuthenticated('hti')">
+          <p class="step__description" *ngIf="!isAuthenticated('hti') && htiDebug">
             In debug mode, paste the base64-encoded HTI token shown by the PIMS below;
             the back-end extracts the citizen's Web ID from it and saves it on the session.
-            Without debug mode this step completes automatically.
           </p>
-          <div class="step__form" *ngIf="!isAuthenticated('hti')">
+          <p class="step__description" *ngIf="!isAuthenticated('hti') && !htiDebug">
+            This step completes automatically once the PIMS has redirected back with the
+            captured HTI token.
+          </p>
+          <div class="step__form" *ngIf="!isAuthenticated('hti') && htiDebug">
             <textarea rows="4" [(ngModel)]="htiToken" name="htiToken" placeholder="Paste the HTI token (eyJ…) here"></textarea>
             <div class="step__actions">
               <button class="btn btn--primary" [disabled]="!htiToken || busyAction === 'hti-token'" (click)="submitHtiToken()">

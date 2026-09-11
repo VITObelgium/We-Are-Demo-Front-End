@@ -5,7 +5,7 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { MainComponent } from './main/main.component';
-import {AMA_ENDPOINT, BACKEND_URL, FRONTEND_URL} from "./tokens";
+import {BACKEND_URL, FRONTEND_URL} from "./tokens";
 import {environment} from "../environments/environment";
 
 @NgModule({ declarations: [
@@ -17,7 +17,6 @@ import {environment} from "../environments/environment";
         AppRoutingModule], providers: [
         { provide: FRONTEND_URL, useValue: new URL(environment.frontendUrl) },
         { provide: BACKEND_URL, useValue: new URL(environment.backendUrl) },
-        { provide: AMA_ENDPOINT, useValue: new URL(environment.amaUrl + environment.amaConsentPath) },
         provideHttpClient(withInterceptorsFromDi())
     ] })
 export class AppModule { }

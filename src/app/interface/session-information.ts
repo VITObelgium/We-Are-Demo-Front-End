@@ -1,3 +1,31 @@
+/** The We Are platform environments supported by the back-end. */
+export type WeAreEnvironment = 'TST' | 'ACC' | 'PRD';
+
+/** A configured client credential pair, without exposing the secret. */
+export interface ClientCredentialOption {
+  index: number,
+  displayName: string
+}
+
+/** Indicator that custom (volatile, session-only) credentials were previously entered for an environment. */
+export interface CustomCredentialIndicator {
+  displayName: string
+}
+
+/** Response of GET /client-credentials/options. */
+export interface ClientCredentialOptions {
+  environments: WeAreEnvironment[],
+  clientsByEnvironment: Record<WeAreEnvironment, ClientCredentialOption[]>,
+  /** Per environment, whether custom (volatile) credentials were previously entered for it. */
+  customCredentialsByEnvironment: Partial<Record<WeAreEnvironment, CustomCredentialIndicator>>,
+  active: {
+    environment: WeAreEnvironment,
+    clientIndex?: number,
+    displayName: string,
+    usingCustomCredentials: boolean
+  }
+}
+
 export interface SessionInformation {
   isLoggedIn: boolean,
   authenticationMethod?: 'oidc' | 'hti',
@@ -10,6 +38,9 @@ export interface SessionInformation {
   pods?: string[],
   clientId?: string,
   usingCustomCredentials?: boolean,
+  environment?: WeAreEnvironment,
+  clientIndex?: number,
+  clientDisplayName?: string,
   tokens?: {
     accessToken: any,
     idToken: any

@@ -1,5 +1,5 @@
 import {Injectable, Inject} from "@angular/core";
-import {AMA_ENDPOINT, BACKEND_URL, FRONTEND_URL} from "../tokens";
+import {BACKEND_URL, FRONTEND_URL} from "../tokens";
 import {SessionService} from "../services/session.service";
 import {SessionInformation} from "../interface/session-information";
 import {environment} from "../../environments/environment";
@@ -10,13 +10,11 @@ import {environment} from "../../environments/environment";
 export class UrlHelper {
   frontendUrl: URL;
   backendUrl: URL;
-  amaEndpoint: URL;
   sessionInformation?: SessionInformation;
 
-  constructor(@Inject(FRONTEND_URL) frontendUrl: URL, @Inject(BACKEND_URL) backendUrl: URL, @Inject(AMA_ENDPOINT) amaEndpoint: URL) {
+  constructor(@Inject(FRONTEND_URL) frontendUrl: URL, @Inject(BACKEND_URL) backendUrl: URL) {
     this.frontendUrl = frontendUrl;
     this.backendUrl = backendUrl;
-    this.amaEndpoint = amaEndpoint;
   }
 
   getFrontendEndpoint() {
@@ -46,6 +44,12 @@ export class UrlHelper {
   getSessionInformationEndpoint() {
     const endpoint = new URL(this.backendUrl.href);
     endpoint.pathname = 'session-information'
+    return endpoint;
+  }
+
+  getSessionResetEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'session/reset'
     return endpoint;
   }
 
@@ -87,6 +91,12 @@ export class UrlHelper {
     return endpoint;
   }
 
+  getClientCredentialOptionsEndpoint() {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'client-credentials/options';
+    return endpoint;
+  }
+
   getHtiLaunchUrlEndpoint(debug?: boolean) {
     const endpoint = new URL(this.backendUrl.href);
     endpoint.pathname = 'hti/launch-url';
@@ -112,12 +122,10 @@ export class UrlHelper {
     return endpoint;
   }
 
-  getAccessRequestConsentEndpoint(accessRequestId: string, flow?: string) {
-    const endpoint = new URL(this.amaEndpoint.href);
-    const redirectUrl = new URL(this.getFrontendEndpoint().href);
-    if (flow) redirectUrl.searchParams.set('flow', flow);
-    endpoint.searchParams.set('requestVcUrl', accessRequestId)
-    endpoint.searchParams.set('redirectUrl', redirectUrl.href)
+  getAccessRequestConsentEndpoint(flow?: string) {
+    const endpoint = new URL(this.backendUrl.href);
+    endpoint.pathname = 'access-request/consent';
+    if (flow) endpoint.searchParams.set('flow', flow);
     return endpoint;
   }
 }
