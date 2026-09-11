@@ -1,5 +1,5 @@
 /** The We Are platform environments supported by the back-end. */
-export type WeAreEnvironment = 'TST' | 'ACC' | 'PRD';
+export type WeAreEnvironment = 'DEV' | 'TST' | 'ACC' | 'PRD';
 
 /** A configured client credential pair, without exposing the secret. */
 export interface ClientCredentialOption {
