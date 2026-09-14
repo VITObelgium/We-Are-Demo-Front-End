@@ -4,7 +4,7 @@
 import {Injectable} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import {BehaviorSubject, firstValueFrom} from "rxjs";
-import {SessionInformation} from "../interface/session-information";
+import {SessionInformation, ClientCredentialOptions, WeAreEnvironment} from "../interface/session-information";
 import {UrlHelper} from "../helper/url-helper";
 import {AccessGrant} from "@inrupt/solid-client-access-grants";
 
@@ -59,6 +59,20 @@ export class SessionService {
   }
 
   /**
+   * Resets the flow-related session data on the back-end (OIDC/HTI authentication state, flow
+   * step summaries, access grants, tokens, ...), so the citizen can restart either demo flow
+   * from scratch. The active environment/client credentials selection is left untouched.
+   */
+  async resetSession(): Promise<void> {
+    await firstValueFrom(this.http.post(this.urlHelper.getSessionResetEndpoint().href, {}, {
+      withCredentials: true,
+      responseType: 'json'
+    }));
+
+    await this.getSessionInformation();
+  }
+
+  /**
    * Sets an access grant for a Solid pod on the sessionInformation. This allows controlled access to the user's data.
    * @param accessGrant - The AccessGrant object containing the access permissions.
    */
@@ -73,17 +87,68 @@ export class SessionService {
    * Subsequent back-end calls will use these credentials instead of the default ones.
    * @param clientId - The client ID to use for this session.
    * @param clientSecret - The client secret to use for this session.
+   * @param environment - The We Are environment these credentials apply to (defaults to the currently active one).
+   * @param displayName - Optional display name shown for these custom credentials.
    */
-  async setClientCredentials(clientId: string, clientSecret: string): Promise<void> {
+  async setClientCredentials(clientId: string, clientSecret: string, environment?: WeAreEnvironment, displayName?: string): Promise<void> {
     await firstValueFrom(this.http.put(this.urlHelper.getClientCredentialsEndpoint().href, {
       clientId,
-      clientSecret
+      clientSecret,
+      environment,
+      displayName
     }, {
       withCredentials: true,
       responseType: 'json'
     }));
 
     await this.getSessionInformation();
+  }
+
+  /**
+   * Selects one of the environment's configured client credential pairs (see `getClientCredentialOptions`)
+   * as active for this session.
+   * @param environment - The We Are environment to switch to.
+   * @param clientIndex - The configured client credential index to use for that environment.
+   */
+  async selectClientCredentials(environment: WeAreEnvironment, clientIndex: number): Promise<void> {
+    await firstValueFrom(this.http.put(this.urlHelper.getClientCredentialsEndpoint().href, {
+      environment,
+      clientIndex
+    }, {
+      withCredentials: true,
+      responseType: 'json'
+    }));
+
+    await this.getSessionInformation();
+  }
+
+  /**
+   * Re-selects the custom (volatile) client credentials previously entered for the given
+   * environment (see `setClientCredentials`), without having to re-type the client secret.
+   * @param environment - The We Are environment whose stored custom credentials should be re-activated.
+   */
+  async selectCustomClientCredentials(environment: WeAreEnvironment): Promise<void> {
+    await firstValueFrom(this.http.put(this.urlHelper.getClientCredentialsEndpoint().href, {
+      environment,
+      useCustomCredentials: true
+    }, {
+      withCredentials: true,
+      responseType: 'json'
+    }));
+
+    await this.getSessionInformation();
+  }
+
+  /**
+   * Retrieves the available We Are environments and, per environment, the configured client
+   * credential pairs (display names only), plus the environment/client currently active on
+   * this session.
+   */
+  async getClientCredentialOptions(): Promise<ClientCredentialOptions> {
+    return await firstValueFrom(this.http.get(this.urlHelper.getClientCredentialOptionsEndpoint().href, {
+      withCredentials: true,
+      responseType: 'json'
+    })) as ClientCredentialOptions;
   }
 
   /**

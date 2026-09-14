@@ -104,6 +104,11 @@
   color: var(--success-dark);
 }
 
+.pill--warning {
+  background: #FBEBC5;
+  color: #8A5A00;
+}
+
 /* ===== Credentials form ===== */
 .credentials__form {
   display: flex;

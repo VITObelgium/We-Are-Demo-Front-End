@@ -18,7 +18,7 @@ import {
   solidDatasetAsTurtle
 } from "@inrupt/solid-client";
 import { SessionService, HtiTokenVerification } from "../services/session.service";
-import { SessionInformation, FlowSteps } from "../interface/session-information";
+import { SessionInformation, FlowSteps, ClientCredentialOptions, WeAreEnvironment, ClientCredentialOption } from "../interface/session-information";
 import { UrlHelper } from "../helper/url-helper";
 import { VcService } from "../services/vc.service";
 import { AccessGrant } from "@inrupt/solid-client-access-grants";
@@ -43,7 +43,33 @@ export class MainComponent implements OnInit {
   /** Client credentials form state */
   clientId = '';
   clientSecret = '';
+  clientDisplayName = '';
   credentialsBusy = false;
+
+  /** Environment/client switcher state */
+  credentialOptions?: ClientCredentialOptions;
+  selectedEnvironment: WeAreEnvironment = 'ACC';
+  /** Bound to the "Client" select: either a configured client index, or `CUSTOM_CLIENT_OPTION`. */
+  selectedClientOption?: number | 'custom';
+  environmentBusy = false;
+
+  /** Sentinel value used by the client `<select>` to represent the (volatile) "custom credentials" option. */
+  readonly CUSTOM_CLIENT_OPTION = 'custom' as const;
+
+  /** Client options available for the currently selected environment. */
+  get clientOptionsForSelectedEnvironment(): ClientCredentialOption[] {
+    return this.credentialOptions?.clientsByEnvironment?.[this.selectedEnvironment] ?? [];
+  }
+
+  /** Whether custom (volatile, session-only) credentials were previously entered for the selected environment. */
+  get hasCustomCredentialsForSelectedEnvironment(): boolean {
+    return !!this.credentialOptions?.customCredentialsByEnvironment?.[this.selectedEnvironment];
+  }
+
+  /** Display name of the volatile custom credentials stored for the selected environment, if any. */
+  get customCredentialsDisplayNameForSelectedEnvironment(): string | undefined {
+    return this.credentialOptions?.customCredentialsByEnvironment?.[this.selectedEnvironment]?.displayName;
+  }
 
   /** HTI flow state */
   htiLaunchUrl?: string;
@@ -58,6 +84,9 @@ export class MainComponent implements OnInit {
   readTurtle: Partial<Record<Flow, string>> = {};
 
   accessGrants?: AccessGrant[];
+
+  /** Whether a session reset request is in progress. */
+  sessionResetBusy = false;
 
   /** Name of the action currently in progress (used to show busy state) */
   busyAction?: string;
@@ -83,6 +112,8 @@ export class MainComponent implements OnInit {
         this.activeTab = 'hti';
       }
     });
+
+    await this.loadCredentialOptions();
 
     this.route.queryParams.subscribe(async params => {
       if (params['flow'] === 'hti' || params['flow'] === 'oidc') {
@@ -175,8 +206,127 @@ export class MainComponent implements OnInit {
   }
 
   /**
-   * Stores the entered client credentials on the back-end session.
-   * Subsequent back-end calls use these credentials instead of the default ones.
+   * Resets the flow-related session data on the back-end (OIDC/HTI authentication state, flow
+   * step summaries, access grants, tokens, ...), so the flow can be restarted from scratch.
+   * The active environment/client credentials selection is left untouched.
+   */
+  async resetSession() {
+    this.sessionResetBusy = true;
+    this.errorMessage = undefined;
+    try {
+      await this.sessionService.resetSession();
+      this.resetLocalFlowState();
+    } catch (error) {
+      this.handleError('Resetting the session failed.', error);
+    } finally {
+      this.sessionResetBusy = false;
+    }
+  }
+
+  /**
+   * Clears local, front-end-only flow state (not persisted on the session) that would
+   * otherwise become stale after a session reset or an environment/client switch.
+   */
+  private resetLocalFlowState() {
+    this.htiLaunchUrl = undefined;
+    this.htiLaunchOpened = false;
+    this.htiToken = '';
+    this.htiVerification = undefined;
+    this.writtenTurtle = {};
+    this.readTurtle = {};
+    this.accessGrants = undefined;
+    this.errorMessage = undefined;
+  }
+
+  /**
+   * Loads the available We Are environments and, per environment, the configured client
+   * credential pairs, syncing the switcher's selection with the session's currently active
+   * environment/client.
+   */
+  async loadCredentialOptions() {
+    try {
+      this.credentialOptions = await this.sessionService.getClientCredentialOptions();
+      this.selectedEnvironment = this.credentialOptions.active.environment;
+      this.selectedClientOption = this.credentialOptions.active.usingCustomCredentials
+        ? this.CUSTOM_CLIENT_OPTION
+        : this.credentialOptions.active.clientIndex;
+    } catch (error) {
+      this.handleError('Loading the available environments failed.', error);
+    }
+  }
+
+  /**
+   * Switches the active We Are environment. Prefers the volatile custom credentials previously
+   * entered for that environment (if any), otherwise selects the first configured client
+   * credential pair for it.
+   */
+  async selectEnvironment(environment: WeAreEnvironment) {
+    this.selectedEnvironment = environment;
+
+    if (this.hasCustomCredentialsForSelectedEnvironment) {
+      await this.selectCustomCredentials();
+      return;
+    }
+
+    const firstOption = this.clientOptionsForSelectedEnvironment[0];
+    if (!firstOption) return;
+
+    await this.selectClient(firstOption.index);
+  }
+
+  /**
+   * Handles a change of the "Client" select: either a configured client index, or the sentinel
+   * value representing the volatile custom credentials stored for the selected environment.
+   */
+  async selectClientOption(value: number | 'custom') {
+    if (value === this.CUSTOM_CLIENT_OPTION) {
+      await this.selectCustomCredentials();
+    } else {
+      await this.selectClient(Number(value));
+    }
+  }
+
+  /**
+   * Selects one of the environment's configured client credential pairs as active for this session.
+   */
+  async selectClient(clientIndex: number) {
+    this.environmentBusy = true;
+    this.errorMessage = undefined;
+    try {
+      await this.sessionService.selectClientCredentials(this.selectedEnvironment, clientIndex);
+      this.selectedClientOption = clientIndex;
+      this.resetLocalFlowState();
+      await this.loadCredentialOptions();
+    } catch (error) {
+      this.handleError('Switching the environment/client failed.', error);
+    } finally {
+      this.environmentBusy = false;
+    }
+  }
+
+  /**
+   * Re-selects the volatile custom credentials previously entered for the selected environment,
+   * without having to re-type the client secret.
+   */
+  async selectCustomCredentials() {
+    this.environmentBusy = true;
+    this.errorMessage = undefined;
+    try {
+      await this.sessionService.selectCustomClientCredentials(this.selectedEnvironment);
+      this.selectedClientOption = this.CUSTOM_CLIENT_OPTION;
+      this.resetLocalFlowState();
+      await this.loadCredentialOptions();
+    } catch (error) {
+      this.handleError('Switching the environment/client failed.', error);
+    } finally {
+      this.environmentBusy = false;
+    }
+  }
+
+  /**
+   * Stores the entered client credentials on the back-end session, for the currently selected
+   * environment. Subsequent back-end calls use these credentials instead of the default ones.
+   * These credentials are volatile: they only live on the session, not in the back-end's `.env`.
    */
   async saveClientCredentials() {
     if (!this.clientId || !this.clientSecret) return;
@@ -184,8 +334,10 @@ export class MainComponent implements OnInit {
     this.credentialsBusy = true;
     this.errorMessage = undefined;
     try {
-      await this.sessionService.setClientCredentials(this.clientId, this.clientSecret);
+      await this.sessionService.setClientCredentials(this.clientId, this.clientSecret, this.selectedEnvironment, this.clientDisplayName || undefined);
       this.clientSecret = '';
+      this.resetLocalFlowState();
+      await this.loadCredentialOptions();
     } catch (error) {
       this.handleError('Saving the client credentials failed.', error);
     } finally {
@@ -203,6 +355,9 @@ export class MainComponent implements OnInit {
       await this.sessionService.clearClientCredentials();
       this.clientId = '';
       this.clientSecret = '';
+      this.clientDisplayName = '';
+      this.resetLocalFlowState();
+      await this.loadCredentialOptions();
     } catch (error) {
       this.handleError('Resetting the client credentials failed.', error);
     } finally {
@@ -280,8 +435,7 @@ export class MainComponent implements OnInit {
     try {
       this.htiVerification = await this.sessionService.verifyHtiToken();
     } catch (error) {
-      const reason = (error as { error?: { reason?: string } })?.error?.reason;
-      this.handleError(`Verification of the HTI token failed.${reason ? ' Reason: ' + reason : ''}`, error);
+      this.handleError('Verification of the HTI token failed.', error);
     } finally {
       this.busyAction = undefined;
     }
@@ -349,7 +503,7 @@ export class MainComponent implements OnInit {
   goToConsent() {
     if (!this.steps.accessRequestId) return;
     this.busyAction = 'consent';
-    window.location.href = this.urlHelper.getAccessRequestConsentEndpoint(this.steps.accessRequestId, this.activeTab).href;
+    window.location.href = this.urlHelper.getAccessRequestConsentEndpoint(this.activeTab).href;
   }
 
   /**
@@ -382,9 +536,42 @@ export class MainComponent implements OnInit {
     }
   }
 
+  /**
+   * Extracts a human-readable reason from a failed HTTP request.
+   * Prefers a reason supplied by the back-end (a JSON body with `reason`/`message`/
+   * `error_description`, or a plain-text body), and falls back to the transport-level
+   * failure so a reason is always shown.
+   */
+  private extractErrorReason(error: unknown): string | undefined {
+    const httpError = error as { error?: unknown; message?: string; statusText?: string; status?: number };
+    const body = httpError?.error;
+
+    if (typeof body === 'string' && body.trim()) {
+      return body.trim();
+    }
+    if (body instanceof Error && body.message?.trim()) {
+      return body.message.trim();
+    }
+    if (body && typeof body === 'object') {
+      const { reason, message, error_description } = body as { reason?: string; message?: string; error_description?: string };
+      const fromBody = reason?.trim() || message?.trim() || error_description?.trim();
+      if (fromBody) return fromBody;
+    }
+
+    if (httpError?.status === 0) {
+      return 'The back-end could not be reached.';
+    }
+    return httpError?.message?.trim() || httpError?.statusText?.trim() || undefined;
+  }
+
   private handleError(message: string, error: unknown) {
     console.error(message, error);
-    this.errorMessage = message;
+    const reason = this.extractErrorReason(error);
+    this.errorMessage = reason ? `${message} Reason: ${reason}` : message;
+
+    // The error banner sits at the top of the page, so scroll it into view: a step further
+    // down the flow may otherwise fail without the citizen noticing.
+    window.scrollTo({top: 0, behavior: 'smooth'});
   }
 
   protected readonly JSON = JSON;
