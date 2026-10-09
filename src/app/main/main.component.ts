@@ -79,6 +79,9 @@ export class MainComponent implements OnInit {
   /** Whether the PIMS should show the HTI token on screen (manual copy/paste) instead of auto-submitting it. */
   htiDebug = false;
 
+  /** Scope input for OIDC login */
+  loginScope = '';
+
   /** Turtle representation of datasets written to / read from the Pod, per flow */
   writtenTurtle: Partial<Record<Flow, string>> = {};
   readTurtle: Partial<Record<Flow, string>> = {};
@@ -106,6 +109,10 @@ export class MainComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.sessionService.sessionInformation$.subscribe((sessionInformation) => {
       this.sessionInformation = sessionInformation;
+
+      if (sessionInformation?.scope !== undefined) {
+        this.loginScope = sessionInformation.scope;
+      }
 
       // Keep the tab in sync with the authentication method used.
       if (sessionInformation?.authenticationMethod === 'hti') {
@@ -188,14 +195,14 @@ export class MainComponent implements OnInit {
    * Initiates the user login process.
    */
   login() {
-    this.sessionService.login();
+    this.sessionService.login(this.loginScope || undefined);
   }
 
   /**
    * Trigger the switchIdentity flow which is a temporary workaround that needs to be done when the user has it's pod and webId removed in another We Are client application.
    */
   switchIdentity() {
-    this.sessionService.switchIdentity();
+    this.sessionService.switchIdentity(this.loginScope || undefined);
   }
 
   /**
@@ -235,6 +242,7 @@ export class MainComponent implements OnInit {
     this.writtenTurtle = {};
     this.readTurtle = {};
     this.accessGrants = undefined;
+    this.loginScope = '';
     this.errorMessage = undefined;
   }
 
@@ -510,7 +518,7 @@ export class MainComponent implements OnInit {
    * Initiates the Authorization Code flow and saves the tokens to the session.
    */
   async saveTokensToSession() {
-    this.sessionService.saveTokens();
+    this.sessionService.saveTokens(this.loginScope || undefined);
   }
 
   /**

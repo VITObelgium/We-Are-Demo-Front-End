@@ -160,12 +160,19 @@
         <div class="step__body">
           <h3 class="step__title">Authorize via browser</h3>
           <p class="step__description">Authenticate the citizen with the We Are OpenID Connect provider in the browser (authorization code flow).</p>
+          <div class="step__form" *ngIf="!isAuthenticated('oidc')">
+            <label class="field">
+              <span class="field__label">Scope (optional)</span>
+              <input type="text" [(ngModel)]="loginScope" name="loginScope" placeholder="e.g. openid webid rrn" autocomplete="off"/>
+            </label>
+          </div>
           <div class="step__actions" *ngIf="!isAuthenticated('oidc')">
             <button class="btn btn--primary" (click)="login()">Log in</button>
             <button class="btn btn--secondary" (click)="switchIdentity()">Switch identity</button>
           </div>
           <div class="step__result" *ngIf="isAuthenticated('oidc')">
             <p>Logged in as <code>{{ sessionInformation?.webId }}</code></p>
+            <p *ngIf="sessionInformation?.scope">Active scope: <code>{{ sessionInformation?.scope }}</code></p>
             <p *ngIf="sessionInformation?.expirationDate">Session expires: {{ sessionInformation?.expirationDate }}</p>
             <div class="step__actions">
               <button class="btn btn--secondary" (click)="switchIdentity()">Switch identity</button>

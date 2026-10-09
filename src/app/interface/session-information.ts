@@ -44,7 +44,8 @@ export interface SessionInformation {
   tokens?: {
     accessToken: any,
     idToken: any
-  }
+  },
+  scope?: string
 }
 
 /** Summaries of the executed flow steps, mirroring the Postman collection. */

@@ -27,16 +27,16 @@ export class SessionService {
     this.getSessionInformation();
   }
 
-  login(): void {
-    window.location.href = this.urlHelper.getLoginEndpoint().href;
+  login(scope?: string): void {
+    window.location.href = this.urlHelper.getLoginEndpoint(false, scope).href;
   }
 
-  switchIdentity() {
-    window.location.href = this.urlHelper.getLoginEndpoint(true).href;
+  switchIdentity(scope?: string) {
+    window.location.href = this.urlHelper.getLoginEndpoint(true, scope).href;
   }
 
-  saveTokens() {
-    window.location.href = this.urlHelper.getSaveTokensEndpoint().href;
+  saveTokens(scope?: string) {
+    window.location.href = this.urlHelper.getSaveTokensEndpoint(scope).href;
   }
 
   logout(): void {

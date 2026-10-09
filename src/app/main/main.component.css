@@ -131,7 +131,8 @@
 }
 
 .field input,
-.step__form textarea {
+.step__form textarea,
+.step__form input[type="text"] {
   font-family: var(--font-family);
   font-size: .9375rem;
   color: var(--dark);
@@ -144,7 +145,8 @@
 }
 
 .field input:focus,
-.step__form textarea:focus {
+.step__form textarea:focus,
+.step__form input[type="text"]:focus {
   border-color: var(--red-500);
   box-shadow: 0 0 0 3px var(--red-100);
 }
@@ -353,10 +355,14 @@
   margin-bottom: .5rem;
 }
 
-.step__form textarea {
+.step__form textarea,
+.step__form input[type="text"] {
   display: block;
   width: 100%;
   margin-bottom: .625rem;
+}
+
+.step__form textarea {
   resize: vertical;
 }
 

@@ -21,17 +21,19 @@ export class UrlHelper {
     return this.frontendUrl;
   }
 
-  getLoginEndpoint(switchIdentity?: boolean) {
+  getLoginEndpoint(switchIdentity?: boolean, scope?: string) {
     const endpoint = new URL(this.backendUrl.href);
     endpoint.pathname = 'login'
     if(switchIdentity) endpoint.searchParams.set('switchIdentity', 'true')
+    if(scope) endpoint.searchParams.set('scope', scope)
     return endpoint;
   }
 
-  getSaveTokensEndpoint() {
+  getSaveTokensEndpoint(scope?: string) {
     const endpoint = new URL(this.backendUrl.href);
     endpoint.pathname = 'login'
     endpoint.searchParams.set('saveTokens', 'true')
+    if(scope) endpoint.searchParams.set('scope', scope)
     return endpoint;
   }
 
